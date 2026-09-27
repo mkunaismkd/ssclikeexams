@@ -104,10 +104,20 @@
     pushTimer = setTimeout(() => run(pushNow), 1500);
   };
 
+  const isAllowed = (email) => (C.allowedEmails || []).map((e) => e.toLowerCase()).includes(String(email || '').toLowerCase());
+
   let signedInAs = null;
   async function onSignedIn(u) {
     if (signedInAs === u.id) return; // Supabase may report the same session more than once
     signedInAs = u.id;
+    if (!isAllowed(u.email)) {
+      // Private app: someone else's account (e.g. a shared-login user of the other app). Sign them straight out.
+      await client.auth.signOut().catch(() => {});
+      user = null; signedInAs = null;
+      setStatus('denied', u.email || '');
+      return;
+    }
+    meta.email = u.email;
     const switched = meta.userId && meta.userId !== u.id;
     user = u;
     if (switched) {
@@ -148,17 +158,29 @@
     get status() { return status; },
     get detail() { return detail; },
     get user() { return user; },
+    /** Signed in right now as an allowed account. */
+    get isOwner() { return Boolean(user && isAllowed(user.email)); },
+    /** This device was last signed in as the owner (lets the app open offline, when sign-in can't be checked). */
+    get rememberedOwner() { return isAllowed(meta.email); },
+    isAllowed,
+    async accessToken() {
+      if (!client) return null;
+      const { data } = await client.auth.getSession();
+      return data && data.session ? data.session.access_token : null;
+    },
     get lastSyncedAt() { return lastSyncedAt; },
     get pending() { return Boolean(meta.dirty); },
     onStatus(fn) { statusListeners.push(fn); },
     onRemoteChange(fn) { remoteListeners.push(fn); },
     syncNow: () => run(pull),
     async sendLink(email) {
-      if (!client) throw new Error('Cloud sync is unavailable right now.');
-      const { error } = await client.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname, shouldCreateUser: true } });
+      if (!client) throw new Error('Sign-in is unavailable right now — check your internet connection.');
+      if (!isAllowed(email)) throw new Error('This is a private app. That email does not have access.');
+      const { error } = await client.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname, shouldCreateUser: false } });
       if (error) throw error;
     },
     async verifyCode(email, token) {
+      if (!isAllowed(email)) throw new Error('This is a private app. That email does not have access.');
       const { error } = await client.auth.verifyOtp({ email, token: token.trim(), type: 'email' });
       if (error) throw error;
     },

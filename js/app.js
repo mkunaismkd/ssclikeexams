@@ -682,7 +682,7 @@
   function Account() {
     const sy = EP.sync;
     if (!sy || sy.status === 'unavailable') {
-      return [h('h2', null, 'Account & sync'), card(null, h('p', null, 'Cloud sync is unavailable right now (you may be offline). Your progress is still saved on this device.'))];
+      return [h('h2', null, '🔒 Private app'), card(null, h('p', null, 'Can\'t reach the sign-in service right now (you may be offline). Connect to the internet and reload to sign in.'))];
     }
     const authError = new URLSearchParams(location.hash.split('?')[1] || '').get('error');
     if (sy.user) {
@@ -718,7 +718,7 @@
         const code = h('input', { type: 'text', inputmode: 'numeric', placeholder: '6-digit code', maxlength: 10, style: 'max-width:160px' });
         const verify = h('button', { class: 'btn', onclick: async () => {
           verify.disabled = true;
-          try { await sy.verifyCode(e, code.value); toast('Signed in'); go('#/account'); render(); }
+          try { await sy.verifyCode(e, code.value); toast('Signed in'); go('#/'); render(); }
           catch (err) { msg.append(h('p', { class: 'error' }, err.message)); verify.disabled = false; }
         } }, 'Verify code');
         codeBox.replaceChildren(h('p', { class: 'muted small' }, 'If your email shows a code instead of (or as well as) a link, enter it here:'), h('div', { class: 'form-row' }, code, verify));
@@ -728,12 +728,13 @@
       send.disabled = false;
     } }, 'Email me a sign-in link');
     email.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') send.click(); });
-    return [h('h2', null, 'Account & sync'),
+    return [h('div', { class: 'lock' },
+      h('img', { src: 'icon.svg', alt: '', width: 56, height: 56 }),
+      h('h2', null, '🔒 ExamPrep is a private app'),
+      h('p', { class: 'muted' }, 'Sign in with the owner\'s email to continue. No password — you\'ll get a sign-in link by email, and your progress syncs across all your devices.'),
+      sy.status === 'denied' ? card(null, h('p', { class: 'error' }, `${sy.detail || 'That account'} does not have access to this app.`)) : null,
       authError ? card(null, h('p', { class: 'error' }, 'That sign-in link didn\'t work: ', authError, '. Request a new one below.')) : null,
-      card('Sync your progress across phone and laptop',
-        h('p', { class: 'muted' }, 'No password needed — we email you a sign-in link. Sign in with the same email on each device and everything stays in step automatically.'),
-        h('div', { class: 'form-row' }, email, send), msg, codeBox,
-        h('p', { class: 'muted small' }, 'Progress you made on this device before signing in is merged into your account.')),
+      card(null, h('div', { class: 'form-row' }, email, send), msg, codeBox)),
     ];
   }
 
@@ -898,8 +899,25 @@
     tutor: () => Tutor(new URLSearchParams(location.hash.split('?')[1] || '').get('q')),
   };
   let lastHash = location.hash;
+  /**
+   * Private app: show the app only to the owner. (The real protection is server-side — the database only
+   * returns the owner's data and the AI endpoint checks the owner's sign-in; this screen keeps the UI tidy.)
+   * While sign-in is still being checked, or offline, a device that was last signed in as the owner opens normally.
+   */
+  function gateOpen() {
+    const sy = EP.sync;
+    if (!sy) return true;
+    if (sy.isOwner) return true;
+    if (sy.status === 'signed-out' || sy.status === 'denied') return false;
+    return sy.rememberedOwner;
+  }
+  let lastGate = null;
+
   function render() {
     cleanups.forEach((f) => f()); cleanups = []; keyHandler = null; leaveGuard = null;
+    lastGate = gateOpen();
+    document.body.classList.toggle('locked', !lastGate);
+    if (!lastGate) { view.replaceChildren(...Account()); return; }
     const [path] = location.hash.replace(/^#\/?/, '').split('?');
     const [name, ...args] = path.split('/').map(decodeURIComponent);
     const fn = routes[name] || Dashboard;
@@ -915,7 +933,11 @@
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 
   if (EP.sync) {
-    EP.sync.onStatus(() => { paintSyncBadge(); if (location.hash.startsWith('#/account')) render(); });
+    EP.sync.onStatus(() => {
+      paintSyncBadge();
+      // Re-render when access changes (signed in/out) or on the account page; never mid-test.
+      if (gateOpen() !== lastGate || (location.hash.startsWith('#/account') && !leaveGuard)) render();
+    });
     // Another device changed something: refresh the screen unless a test or practice session is in progress.
     EP.sync.onRemoteChange(() => { if (!leaveGuard && !keyHandler) render(); });
     paintSyncBadge();

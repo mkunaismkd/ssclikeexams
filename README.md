@@ -18,6 +18,16 @@ A learn → practise → mock → revise platform for **SSC CGL** (Tier 1 & 2) a
 
 Works on phones, supports dark mode, and installs as an app (PWA) with offline practice.
 
+## Private app (owner only)
+
+ExamPrep is locked to one account, `mkunaismkd@gmail.com`, at three levels:
+
+1. **Database:** row-level-security policies on `public.examprep_progress` only allow that email (checked from the signed-in user's token), so other users of the shared Supabase project can't read or write anything.
+2. **AI:** `/api/ai` verifies the caller's Supabase sign-in with Supabase Auth and only serves the allowed email, so nobody else can use the Groq quota. Change the list with the `ALLOWED_EMAILS` env var (comma-separated). `AI_REQUIRE_AUTH=false` turns the check off for local development only.
+3. **App:** anyone who isn't signed in as the owner sees a lock screen; sign-in links are only sent to the allowed email, and other accounts are signed straight out. (The page's code and built-in questions are public files, like any website; your data and the AI are what's protected.)
+
+To allow another email later, add it in `js/config.js` (`allowedEmails`), in `ALLOWED_EMAILS` on Vercel, and in the four policies on `public.examprep_progress`.
+
 ## Cloud sync (Supabase)
 
 Progress is stored in the `public.examprep_progress` table (one JSON document per user, protected by row-level security so each user can only read and write their own row). The browser uses the Supabase **publishable** key in `js/config.js`, which is designed to be public.
@@ -25,7 +35,7 @@ Progress is stored in the `public.examprep_progress` table (one JSON document pe
 One-time setup in the Supabase dashboard (project `upsccurrent`):
 
 1. **Authentication → URL Configuration → Redirect URLs**: add `https://ssclikeexams.vercel.app/**` (and `http://localhost:3000/**` for local use). Without this, sign-in links send people to the other app's Site URL.
-2. **Emails to other people**: Supabase's built-in mailer only delivers to your own team's addresses and is rate-limited. To let anyone sign in, add a custom SMTP provider under **Authentication → Emails → SMTP Settings** (e.g. Resend or Brevo, both have free tiers).
+2. Supabase's built-in mailer is rate-limited (a few emails per hour), which is fine for one person.
 
 How sync behaves: every change is pushed ~1.5 s later; the app pulls when it opens, when you return to it, when the network comes back, and every minute. Writes are conditional on the version last seen, so two devices can't overwrite each other — on a conflict the app merges both and retries. Progress made on a device before signing in is added to the account on first sign-in. Signing out removes the progress from that device (it stays in the cloud).
 

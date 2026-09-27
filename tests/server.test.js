@@ -31,4 +31,5 @@ test('server serves the app and guards private files', async (t) => {
   const health = JSON.parse((await get(port, '/api/health')).body);
   assert.deepStrictEqual(health, { ok: true, ai: false });
   assert.strictEqual((await get(port, '/api/ai')).status, 405);
+  assert.strictEqual((await get(port, '/api/ai', 'POST')).status, 401, 'AI requires sign-in');
 });

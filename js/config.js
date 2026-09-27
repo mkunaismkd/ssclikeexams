@@ -6,5 +6,7 @@
     supabaseUrl: 'https://xzzuwvlfsanrrwgywlrt.supabase.co',
     supabaseKey: 'sb_publishable_izEEKl6jWb178pOCw3DsFA_ul1fzq5N',
     progressTable: 'examprep_progress',
+    // Personal app: only these accounts may use it (also enforced by the database policies and the AI server).
+    allowedEmails: ['mkunaismkd@gmail.com'],
   };
 })(typeof window !== 'undefined' ? window : globalThis);

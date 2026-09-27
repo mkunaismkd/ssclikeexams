@@ -19,7 +19,9 @@
 
   async function call(payload) {
     if (!(await available())) throw new Error(reason);
-    const r = await fetch('api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const token = EP.sync && EP.sync.accessToken ? await EP.sync.accessToken() : null;
+    if (!token) throw new Error('This is a private app — sign in (☁ at the top) to use the AI features.');
+    const r = await fetch('api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(payload) });
     let data = {};
     try { data = await r.json(); } catch { /* non-JSON error page */ }
     if (!r.ok) throw new Error(data.error || `AI request failed (${r.status})`);

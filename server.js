@@ -4,6 +4,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { handleAI, rateLimiter } = require('./lib/ai');
+const { checkAccess } = require('./lib/auth');
 
 // Minimal .env loader (KEY=value lines) so no npm install is needed.
 const envFile = path.join(__dirname, '.env');
@@ -43,6 +44,8 @@ const server = http.createServer(async (req, res) => {
     if (req.method !== 'POST') return send(res, 405, { error: 'Use POST' });
     const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
     if (!allow(ip)) return send(res, 429, { error: 'Too many AI requests — please wait a minute.' });
+    const access = await checkAccess(req.headers.authorization);
+    if (!access.ok) return send(res, access.status, { error: access.error });
     try {
       const body = await readJson(req);
       const out = await handleAI(body);
