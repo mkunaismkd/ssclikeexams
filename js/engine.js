@@ -4,7 +4,9 @@
   const BANK = root.EP_BANK || {};
   const { pick, shuffle, hash } = EP;
 
-  const GEN = { quant: EP.quantTopics || {}, reasoning: EP.reasoningTopics || {} };
+  const GEN = { quant: EP.quantTopics || {}, reasoning: EP.reasoningTopics || {}, ...(EP.aiGen || {}) };
+  // Share of hand-written questions in a practice set for subjects that also have generators.
+  const BANK_SHARE = { mlfund: 0.6, dl: 0.6, genai: 0.7 };
 
   function fromBank(subject, row) {
     const [topic, q, options, answer, explanation] = row;
@@ -47,7 +49,7 @@
     const genTopics = topic ? ((GEN[subject] || {})[topic] ? [topic] : []) : Object.keys(GEN[subject] || {});
     const bank = shuffle(bankRows(subject, topic)).map((r) => fromBank(subject, r)).filter((q) => !seen.has(q.id));
     // For generated subjects, mix in ~25% hand-written questions (syllogisms, seating, …).
-    const bankShare = genTopics.length ? Math.min(bank.length, Math.round(n * 0.25)) : n;
+    const bankShare = genTopics.length ? Math.min(bank.length, Math.round(n * (BANK_SHARE[subject] || 0.25))) : n;
     for (const q of bank.slice(0, bankShare)) { out.push(shuffleOptions(q)); seen.add(q.id); }
     let guard = 0;
     while (out.length < n && genTopics.length && guard++ < n * 20) {

@@ -9,6 +9,10 @@
     ga: { name: 'General Awareness', short: 'GA', icon: '🌏' },
     esi: { name: 'Economic & Social Issues', short: 'ESI', icon: '📈' },
     fm: { name: 'Finance & Management', short: 'F&M', icon: '🏦' },
+    mlfund: { name: 'Machine Learning Fundamentals', short: 'ML', icon: '📊' },
+    dl: { name: 'Deep Learning', short: 'Deep Learning', icon: '🧠' },
+    genai: { name: 'GenAI & LLMs', short: 'GenAI', icon: '✨' },
+    mlops: { name: 'MLOps & Deployment', short: 'MLOps', icon: '🚀' },
   };
 
   EP.EXAMS = {
@@ -54,9 +58,29 @@
     },
   };
 
+  // AI / ML career track: interview-style tests, no negative marking.
+  Object.assign(EP.EXAMS, {
+    'ai-interview': {
+      name: 'AI/ML Engineer Interview Mock', family: 'AI / ML & GenAI', minutes: 45, plus: 1, minus: 0, sectional: false,
+      sections: [{ subject: 'mlfund', count: 12 }, { subject: 'dl', count: 10 }, { subject: 'genai', count: 12 }, { subject: 'mlops', count: 6 }],
+      note: '40 questions · 45 min · concepts + calculations across the stack',
+    },
+    'ai-genai': {
+      name: 'GenAI Engineer Assessment', family: 'AI / ML & GenAI', minutes: 30, plus: 1, minus: 0, sectional: false,
+      sections: [{ subject: 'genai', count: 20 }, { subject: 'mlops', count: 5 }],
+      note: '25 questions · 30 min · LLMs, RAG, agents, fine-tuning, LLMOps',
+    },
+    'ai-quick': {
+      name: 'Quick 15 (AI/ML)', family: 'AI / ML & GenAI', minutes: 15, plus: 1, minus: 0, sectional: false,
+      sections: [{ subject: 'mlfund', count: 5 }, { subject: 'dl', count: 4 }, { subject: 'genai', count: 6 }],
+      note: 'A short daily drill · 15 questions · 15 min',
+    },
+  });
+
   EP.TRACKS = {
-    ssc: { name: 'SSC CGL', subjects: ['quant', 'reasoning', 'english', 'ga'], mocks: ['ssc-t1', 'ssc-t2-s1', 'ssc-t2-s2', 'quick'] },
-    rbi: { name: 'RBI Grade B', subjects: ['quant', 'reasoning', 'english', 'ga', 'esi', 'fm'], mocks: ['rbi-p1', 'rbi-p2-esi', 'rbi-p2-fm', 'quick'] },
+    ssc: { name: 'SSC CGL', short: 'SSC', subjects: ['quant', 'reasoning', 'english', 'ga'], mocks: ['ssc-t1', 'ssc-t2-s1', 'ssc-t2-s2', 'quick'] },
+    rbi: { name: 'RBI Grade B', short: 'RBI', subjects: ['quant', 'reasoning', 'english', 'ga', 'esi', 'fm'], mocks: ['rbi-p1', 'rbi-p2-esi', 'rbi-p2-fm', 'quick'] },
+    ai: { name: 'AI / ML & GenAI', short: 'AI / ML', career: true, subjects: ['mlfund', 'dl', 'genai', 'mlops'], mocks: ['ai-interview', 'ai-genai', 'ai-quick'], quick: 'ai-quick' },
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = EP;

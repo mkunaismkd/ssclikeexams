@@ -11,8 +11,9 @@ function check(q, where) {
   assert.ok(!/NaN|undefined|Infinity/.test(q.q + q.explanation), `${where}: bad text ${q.q} / ${q.explanation}`);
 }
 
-for (const subject of ['quant', 'reasoning']) {
-  const topics = subject === 'quant' ? EP.quantTopics : EP.reasoningTopics;
+const GENERATORS = { quant: EP.quantTopics, reasoning: EP.reasoningTopics, ...EP.aiGen };
+for (const subject of Object.keys(GENERATORS)) {
+  const topics = GENERATORS[subject];
   for (const [topic, fns] of Object.entries(topics)) {
     test(`${subject} / ${topic} generators produce valid MCQs`, () => {
       for (const fn of fns) for (let i = 0; i < 400; i++) check(fn(), `${subject}/${topic}`);

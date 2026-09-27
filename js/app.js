@@ -7,6 +7,10 @@
   let leaveGuard = null; // function returning true if navigation should be blocked
 
   // ---------- tiny DOM helpers ----------
+  // replaceChildren() prints null/false as text; skip them everywhere, like h() does.
+  const nativeReplace = Element.prototype.replaceChildren;
+  Element.prototype.replaceChildren = function (...kids) { return nativeReplace.apply(this, kids.flat(Infinity).filter((k) => k != null && k !== false)); };
+
   function h(tag, attrs, ...kids) {
     const el = document.createElement(tag);
     if (attrs) for (const [k, v] of Object.entries(attrs)) {
@@ -46,7 +50,9 @@
   const track = () => EP.TRACKS[S.state.profile.track];
   const subj = (k) => EP.SUBJECTS[k];
   const toast = (msg) => { const t = h('div', { class: 'toast' }, msg); document.body.append(t); setTimeout(() => t.remove(), 2600); };
-  const daysLeft = () => { const d = S.state.profile.examDate; if (!d) return null; return Math.ceil((new Date(d + 'T00:00:00') - new Date(S.today() + 'T00:00:00')) / 86400000); };
+  /** Each track keeps its own date (exam date for SSC/RBI, goal date for the career track). */
+  const trackDate = () => { const p = S.state.profile; return (p.dates && p.dates[p.track]) || (EP.TRACKS[p.track].career ? '' : p.examDate) || ''; };
+  const daysLeft = () => { const d = trackDate(); if (!d) return null; return Math.ceil((new Date(d + 'T00:00:00') - new Date(S.today() + 'T00:00:00')) / 86400000); };
   const go = (hash) => { location.hash = hash; };
 
   function card(title, ...body) { return h('section', { class: 'card' }, title ? h('h3', null, title) : null, ...body); }
@@ -191,9 +197,10 @@
         h('div', null,
           h('h1', null, p.name ? `Namaste, ${p.name}!` : 'Namaste! 🙏'),
           EP.sync && EP.sync.status === 'signed-out' ? h('p', null, h('a', { href: '#/account' }, '☁ Sign in to sync your progress to your phone and other devices →')) : null,
-          h('p', { class: 'muted' }, `Preparing for ${t.name}`, dl != null ? ` · ${dl >= 0 ? dl + ' days to go' : 'exam date passed — update it in Plan'}` : ' · set your exam date in Plan')),
+          h('p', { class: 'muted' }, t.career ? `Upskilling in ${t.name}` : `Preparing for ${t.name}`,
+            dl != null ? ` · ${dl >= 0 ? dl + ' days to go' : (t.career ? 'goal date passed' : 'exam date passed') + ' — update it in Plan'}` : ` · set your ${t.career ? 'goal' : 'exam'} date in Plan`)),
         h('div', { class: 'track-switch' }, Object.entries(EP.TRACKS).map(([k, v]) =>
-          h('button', { class: 'seg' + (p.track === k ? ' on' : ''), onclick: () => { p.track = k; S.save(); render(); } }, v.name)))),
+          h('button', { class: 'seg' + (p.track === k ? ' on' : ''), title: v.name, onclick: () => { p.track = k; S.save(); render(); } }, h('span', { class: 'full' }, v.name), h('span', { class: 'short' }, v.short || v.name))))),
       h('div', { class: 'stats' },
         stat('🔥', S.streak() + (S.streak() === 1 ? ' day' : ' days'), 'Streak'),
         stat('🎯', `${todayN}/${p.dailyGoal}`, 'Today\'s questions', bar(goalPct)),
@@ -202,7 +209,7 @@
       h('div', { class: 'grid2' },
         card('Start now',
           h('div', { class: 'actions' },
-            action('⚡', 'Daily Quick 20', 'Mixed mini-mock, 15 min', '#/mock/quick'),
+            action('⚡', t.career ? 'Daily Quick 15' : 'Daily Quick 20', t.career ? 'ML + DL + GenAI drill, 15 min' : 'Mixed mini-mock, 15 min', '#/mock/' + (t.quick || 'quick')),
             action('🎯', 'Practice weak topics', weak.length ? weak.map((w) => w.topic).slice(0, 2).join(', ') : 'Solve a few questions first', '#/practice/weak'),
             action('🔁', `Revise mistakes (${due})`, 'Spaced repetition', '#/revise'),
             action('✨', 'Ask the AI tutor', 'Doubts, shortcuts, strategy', '#/tutor'))),
@@ -251,7 +258,7 @@
       return [wrap];
     }
     if (!subject || !EP.SUBJECTS[subject]) {
-      return [h('h2', null, 'Practice'), h('p', { class: 'muted' }, 'Pick a subject. Quant and Reasoning questions are generated fresh every time, so you never run out.'),
+      return [h('h2', null, 'Practice'), h('p', { class: 'muted' }, track().career ? 'Pick a subject. Calculation questions (metrics, parameter counts, RAG chunking, token costs…) are generated fresh every time; concept questions are interview-style.' : 'Pick a subject. Quant and Reasoning questions are generated fresh every time, so you never run out.'),
         h('div', { class: 'topic-grid' }, t.subjects.map((s) => { const st = S.subjectStats(s); return h('a', { class: 'topic big', href: '#/practice/' + s }, h('span', { class: 'icon' }, subj(s).icon), h('strong', null, subj(s).name), bar(st.acc), h('small', { class: 'muted' }, st.n ? `${pct(st.acc)} accuracy · ${st.n} solved` : 'Not started')); }))];
     }
     if (topic != null) return [startPractice(subject, topic === '*' ? null : topic)];
@@ -326,7 +333,7 @@
       h('table', null, h('thead', null, h('tr', null, h('th', null, 'Section'), h('th', null, 'Questions'), h('th', null, 'Marks'), e.sectional ? h('th', null, 'Time') : null)),
         h('tbody', null, e.sections.map((s) => h('tr', null, h('td', null, subj(s.subject).name), h('td', null, s.count), h('td', null, EP.fmt(s.count * e.plus)), e.sectional ? h('td', null, s.minutes + ' min') : null)))),
       h('ul', null,
-        h('li', null, `${total} questions · ${mins} minutes · +${EP.fmt(e.plus)} for correct, −${EP.fmt(e.minus)} for wrong, 0 for unattempted.`),
+        h('li', null, `${total} questions · ${mins} minutes · +${EP.fmt(e.plus)} for correct, ` + (e.minus ? `−${EP.fmt(e.minus)} for wrong, 0 for unattempted.` : 'no negative marking.')),
         e.sectional ? h('li', null, 'Sectional timing: each section locks when its time ends; you cannot go back.') : h('li', null, 'You can move freely between sections.'),
         h('li', null, 'Use "Mark for review" for questions you want to revisit. Marked + answered questions are evaluated.'),
         h('li', null, 'Keyboard: 1–4 to choose, → / ← to move.')),
@@ -447,7 +454,7 @@
     view.replaceChildren(
       h('div', { class: 'result-hero' }, h('div', { class: 'muted' }, e.name), h('div', { class: 'big' }, `${EP.fmt(r.score)} / ${r.max}`),
         h('div', null, `${r.correct} correct · ${r.wrong} wrong · ${qs.length - attempted} unattempted · accuracy ${pct(r.correct / Math.max(1, attempted))} · ${fmtTime(r.secs)}`),
-        r.wrong ? h('div', { class: 'muted' }, `Negative marking cost you ${EP.fmt(r.wrong * e.minus)} marks.`) : null),
+        r.wrong && e.minus ? h('div', { class: 'muted' }, `Negative marking cost you ${EP.fmt(r.wrong * e.minus)} marks.`) : null),
       card('Section-wise', h('table', null, h('thead', null, h('tr', null, ['Section', 'Score', 'Correct', 'Wrong', 'Accuracy'].map((x) => h('th', null, x)))),
         h('tbody', null, r.sections.map((s) => h('tr', null, h('td', null, subj(s.subject).name), h('td', null, `${EP.fmt(s.score)}/${EP.fmt(s.max)}`), h('td', null, s.correct), h('td', null, s.wrong), h('td', null, s.correct + s.wrong ? pct(s.correct / (s.correct + s.wrong)) : '—')))))),
       card('AI performance coach', aiBox(() => EP.ai.analyze(collectStats({ justFinished: r })), 'Analyse this mock & plan my next week')),
@@ -776,7 +783,13 @@
     };
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
     const t = track();
-    const chips = [
+    const chips = t.career ? [
+      'Make me a 90-day roadmap from data analyst to GenAI engineer',
+      'Explain RAG end to end with a small Python example',
+      'Precision vs recall — explain with a real business example',
+      'Top 10 GenAI engineer interview questions with model answers',
+      'Which portfolio project should I build first, and how?',
+    ] : [
       `Make me a 30-day revision plan for ${t.name}`,
       'Explain the shortcut for successive percentage change',
       t.name === 'RBI Grade B' ? 'Explain the LAF corridor: repo, SDF and MSF' : 'Most important static GK topics for SSC CGL',
@@ -798,14 +811,14 @@
   function Plan() {
     const p = S.state.profile; const t = track();
     const name = h('input', { type: 'text', value: p.name, placeholder: 'Your name' });
-    const date = h('input', { type: 'date', value: p.examDate });
+    const date = h('input', { type: 'date', value: trackDate() });
     const goal = h('input', { type: 'number', min: 10, max: 500, value: p.dailyGoal });
     const hours = h('input', { type: 'number', min: 1, max: 14, value: p.hours || 4 });
-    const save = () => { p.name = name.value.trim(); p.examDate = date.value; p.dailyGoal = Math.max(10, Number(goal.value) || 50); p.hours = Math.max(1, Number(hours.value) || 4); S.save(); render(); toast('Saved'); };
+    const save = () => { p.name = name.value.trim(); p.dates = { ...(p.dates || {}), [p.track]: date.value }; if (!t.career) p.examDate = date.value; p.dailyGoal = Math.max(10, Number(goal.value) || 50); p.hours = Math.max(1, Number(hours.value) || 4); S.save(); render(); toast('Saved'); };
     const dl = daysLeft();
 
     // Weight subjects by marks share, boosted by weakness.
-    const weights = t.subjects.map((s) => { const st = S.subjectStats(s); const base = { quant: 1.3, reasoning: 1.2, english: 1, ga: 1.1, esi: 1, fm: 1 }[s]; return [s, base * (st.acc == null ? 1 : 1.5 - st.acc)]; });
+    const weights = t.subjects.map((s) => { const st = S.subjectStats(s); const base = { quant: 1.3, reasoning: 1.2, english: 1, ga: 1.1, esi: 1, fm: 1, mlfund: 1.1, dl: 1, genai: 1.3, mlops: 0.8 }[s] || 1; return [s, base * (st.acc == null ? 1 : 1.5 - st.acc)]; });
     const W = weights.reduce((a, [, w]) => a + w, 0);
     const hrs = p.hours || 4;
     const split = weights.map(([s, w]) => [s, Math.max(0.5, Math.round((w / W) * hrs * 2) / 2)]);
@@ -813,7 +826,11 @@
     let phases = null;
     if (dl != null && dl > 0) {
       const f = Math.round(dl * 0.45), pr = Math.round(dl * 0.35), m = dl - f - pr;
-      phases = [
+      phases = t.career ? [
+        ['Foundations', f, 'Python, ML fundamentals and deep-learning basics from the Learn notes; 20+ practice questions per topic; one small project.'],
+        ['Build', pr, 'GenAI stack: prompting, RAG, agents, fine-tuning. Ship 2–3 portfolio projects from the list below and write them up on GitHub.'],
+        ['Interview-ready', m, 'Interview mocks every 2–3 days, MLOps/deployment for your best project, revise the mistake book, and practise explaining your projects aloud.'],
+      ] : [
         ['Foundation', f, 'Learn every topic once from notes; 20–30 topic-wise questions per topic; build formula sheets.'],
         ['Practice', pr, 'Mixed sets under time pressure; target accuracy ≥ 80%; one sectional mock every 2 days.'],
         ['Mocks & Revision', m, `Full mock every 1–2 days (${t.mocks.slice(0, 2).map((k) => EP.EXAMS[k].name).join(', ')}); analyse each; revise mistake book daily.`],
@@ -822,25 +839,31 @@
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const rotation = t.subjects;
     return [
-      h('h2', null, 'Study Plan'),
+      h('h2', null, t.career ? 'Learning Roadmap' : 'Study Plan'),
       card('Your details', h('div', { class: 'form-grid' },
-        h('label', null, 'Name', name), h('label', null, `${t.name} exam date`, date),
+        h('label', null, 'Name', name), h('label', null, t.career ? 'Goal date (job switch / interview)' : `${t.name} exam date`, date),
         h('label', null, 'Study hours / day', hours), h('label', null, 'Daily question goal', goal)),
         h('button', { class: 'btn primary', onclick: save }, 'Save')),
       phases ? card(`${dl} days to go — your phases`, h('div', { class: 'phases' }, phases.map(([n, d, txt], i) => h('div', { class: 'phase' }, h('div', { class: 'muted' }, `Phase ${i + 1} · ${d} days`), h('strong', null, n), h('p', null, txt)))))
-        : card('Set your exam date', h('p', { class: 'muted' }, 'Add the exam date above to get a phase-wise plan.')),
+        : card(t.career ? 'Set your goal date' : 'Set your exam date', h('p', { class: 'muted' }, `Add the ${t.career ? 'goal' : 'exam'} date above to get a phase-wise plan.`)),
       card(`Daily time split (${hrs} h) — weaker subjects get more time`, ...split.map(([s, hh]) => h('div', { class: 'subj-row' }, h('span', null, subj(s).short), bar(hh / hrs), h('span', { class: 'muted' }, hh + ' h')))),
       card('Weekly rhythm', h('table', null, h('thead', null, h('tr', null, h('th', null, 'Day'), h('th', null, 'Main focus'), h('th', null, 'Also'))),
         h('tbody', null, days.map((d, i) => h('tr', null, h('td', null, d),
-          h('td', null, i === 6 ? 'Full mock + analysis' : subj(rotation[i % rotation.length]).name),
-          h('td', null, i === 6 ? 'Revise mistake book' : `${subj(rotation[(i + 1) % rotation.length]).short} practice · GA 30 min · Revision 20 min`)))))),
+          h('td', null, i === 6 ? (t.career ? 'Interview mock + project work' : 'Full mock + analysis') : subj(rotation[i % rotation.length]).name),
+          h('td', null, i === 6 ? 'Revise mistake book' : t.career ? `${subj(rotation[(i + 1) % rotation.length]).short} practice · 45 min project work · 15 min AI news/papers` : `${subj(rotation[(i + 1) % rotation.length]).short} practice · GA 30 min · Revision 20 min`)))))),
       card('Syllabus checklist', ...t.subjects.map((s) => {
         const topics = [...new Set([...Object.keys(EP.NOTES[s] || {}), ...EP.topics(s)])];
         const doneN = topics.filter((tp) => S.state.done[s + '|' + tp]).length;
         return h('details', { class: 'review' }, h('summary', null, h('strong', null, subj(s).name), h('span', { class: 'muted' }, ` ${doneN}/${topics.length}`)),
           h('div', { class: 'checks' }, topics.map((tp) => h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: S.state.done[s + '|' + tp], onchange: (e) => { S.state.done[s + '|' + tp] = e.target.checked; S.save(); } }), ' ', tp))));
       })),
-      card('AI study plan', aiBox(() => EP.ai.analyze(collectStats({ hoursPerDay: hrs })), 'Build my personalised 7-day plan')),
+      t.career ? card(`Portfolio projects (${(EP.CAREER_PROJECTS || []).filter(([n]) => S.state.done['project|' + n]).length}/${(EP.CAREER_PROJECTS || []).length})`,
+        h('p', { class: 'muted' }, 'Projects are what get you hired. Build them in order; tick each one when it\'s on GitHub with a README.'),
+        ...(EP.CAREER_PROJECTS || []).map(([n, desc]) => h('div', { class: 'project' + (S.state.done['project|' + n] ? ' done' : '') },
+          h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: S.state.done['project|' + n], onchange: (e) => { S.state.done['project|' + n] = e.target.checked; S.save(); render(); } }), ' ', h('strong', null, n)),
+          h('p', { class: 'muted small' }, desc),
+          h('a', { class: 'small', href: '#/tutor?q=' + encodeURIComponent(`Help me build this portfolio project step by step: "${n}" — ${desc} Give me the architecture, tech stack, milestones and what to put in the README.`) }, '✨ Plan it with the AI tutor →')))) : null,
+      card(t.career ? 'AI learning plan' : 'AI study plan', aiBox(() => EP.ai.analyze(collectStats({ hoursPerDay: hrs })), 'Build my personalised 7-day plan')),
     ];
   }
 
@@ -916,6 +939,11 @@
   function render() {
     cleanups.forEach((f) => f()); cleanups = []; keyHandler = null; leaveGuard = null;
     lastGate = gateOpen();
+    document.body.classList.toggle('career', Boolean(track().career));
+    const foot = document.getElementById('foot');
+    if (foot) foot.textContent = track().career
+      ? 'AI moves fast — check official docs for current model names, prices and APIs. AI answers can be wrong; verify important facts.'
+      : 'Exam patterns follow the latest notified schemes — always confirm with the official SSC / RBI notification. AI answers can be wrong; verify important facts.';
     document.body.classList.toggle('locked', !lastGate);
     if (!lastGate) { view.replaceChildren(...Account()); return; }
     const [path] = location.hash.replace(/^#\/?/, '').split('?');

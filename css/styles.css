@@ -197,3 +197,11 @@ body.locked nav, body.locked .sync-badge { display: none; }
 .lock { max-width: 520px; margin: 3rem auto; text-align: center; }
 .lock .card { text-align: left; }
 .lock .form-row input { min-width: 0; }
+
+/* career track */
+body.career nav a[href="#/pyq"] { display: none; }
+.project { border-top: 1px solid var(--border); padding: .6rem 0; }
+.project p { margin: .2rem 0 .3rem 1.6rem; } .project a { margin-left: 1.6rem; }
+.project.done strong { text-decoration: line-through; color: var(--muted); }
+.seg .short { display: none; }
+@media (max-width: 820px) { .track-switch .seg .full { display: none; } .track-switch .seg .short { display: inline; } }

@@ -1,4 +1,4 @@
-# ExamPrep — SSC CGL & RBI Grade B
+# ExamPrep — SSC CGL, RBI Grade B & AI/ML careers
 
 A learn → practise → mock → revise platform for **SSC CGL** (Tier 1 & 2) and **RBI Grade B** (Phase 1 & 2), with a free AI tutor powered by **Groq**.
 
@@ -14,6 +14,7 @@ A learn → practise → mock → revise platform for **SSC CGL** (Tier 1 & 2) a
 | **AI (Groq)** | ✨ *Explain with AI* on any question · AI tutor chat for doubts · AI question generator for any topic (great for current affairs and banking awareness) · AI performance coach that reads your stats and builds a 7-day plan. |
 | **Plan & progress** | Exam countdown, phase-wise plan, daily time split weighted towards weak subjects, syllabus checklist, streaks, activity heatmap, topic accuracy, mock score trend. Export/import your progress. |
 
+| **AI / ML & GenAI career track** | A third track for upskilling: ML fundamentals, deep learning, GenAI & LLMs, and MLOps. Notes and roadmaps, interview-style concept questions, fresh calculation questions (confusion-matrix metrics, parameter counts, CNN output sizes, attention cost, RAG chunking, token cost, embedding memory), interview mocks without negative marking, a learning roadmap with 8 portfolio projects, and an AI tutor that acts as a senior AI/ML mentor. |
 | **Cloud sync** | Sign in with just your email (no password) and progress syncs automatically between phone, laptop and any other device. Works offline too — changes upload when you're back online. |
 
 Works on phones, supports dark mode, and installs as an app (PWA) with offline practice.
@@ -70,7 +71,8 @@ Without a key everything except the ✨ AI features still works. You can even op
 
 ```
 index.html, css/, icon.svg, manifest.webmanifest, sw.js   – the app (plain JS, no build step)
-js/gen-quant.js, js/gen-reasoning.js   – procedural question generators with worked solutions
+js/gen-quant.js, js/gen-reasoning.js, js/gen-ai.js – procedural question generators with worked solutions
+js/notes-ai.js, js/bank/ai.js         – AI/ML career track notes, roadmap projects and questions
 js/bank/*.js                           – hand-written question banks; bank/pyq.js holds built-in previous-year papers
 js/exams.js                            – exam patterns (sections, timing, marking)
 js/notes.js                            – study notes
