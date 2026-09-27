@@ -26,7 +26,42 @@
   try { state = Object.assign(blank(), JSON.parse(localStorage.getItem(KEY) || '{}')); } catch { state = blank(); }
   state.profile = Object.assign(blank().profile, state.profile);
 
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* storage full or blocked */ } };
+  let onChange = null; // set by sync.js: called after every local change
+  const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* storage full or blocked */ } };
+  const save = () => { persist(); if (onChange) onChange(); };
+
+  /** Replace everything (used when adopting synced cloud data). Does not trigger another sync. */
+  function replaceState(obj) {
+    state = Object.assign(blank(), obj || {});
+    state.profile = Object.assign(blank().profile, state.profile);
+    persist();
+  }
+
+  /**
+   * Merge two progress documents (e.g. this device's offline progress with the cloud copy).
+   * Counters take the larger side (or are added when `add` is set — for two separate histories, like a
+   * device's offline progress joining an account for the first time), collections are unioned, and `b`
+   * wins ties on simple settings.
+   */
+  function mergeStates(a, b, { add = false } = {}) {
+    a = Object.assign(blank(), a || {}); b = Object.assign(blank(), b || {});
+    const out = blank();
+    out.profile = { ...a.profile };
+    for (const [k, v] of Object.entries(b.profile || {})) if (v !== '' && v != null) out.profile[k] = v;
+    const bigger = (x, y, size) => (!x ? y : !y ? x : size(y) >= size(x) ? y : x);
+    const sum = (x, y) => { const o = { ...(x || {}) }; for (const [k, v] of Object.entries(y || {})) o[k] = (o[k] || 0) + v; return o; };
+    for (const k of new Set([...Object.keys(a.topics), ...Object.keys(b.topics)])) out.topics[k] = add ? sum(a.topics[k], b.topics[k]) : bigger(a.topics[k], b.topics[k], (t) => t.c + t.w);
+    for (const k of new Set([...Object.keys(a.days), ...Object.keys(b.days)])) out.days[k] = add ? sum(a.days[k], b.days[k]) : bigger(a.days[k], b.days[k], (d) => d.n);
+    const mockKey = (m) => [m.date, m.examKey, m.title || '', m.score, Math.round(m.secs || 0)].join('|');
+    const mocks = new Map();
+    for (const m of [...a.mocks, ...b.mocks]) mocks.set(mockKey(m), m);
+    out.mocks = [...mocks.values()].sort((x, y) => String(x.date).localeCompare(String(y.date)));
+    for (const k of ['mistakes', 'bookmarks', 'pyqPapers']) out[k] = { ...a[k], ...b[k] };
+    for (const [k, v] of Object.entries({ ...a.done, ...b.done })) out.done[k] = Boolean(a.done[k] || b.done[k] || v);
+    out.chat = (b.chat || []).length >= (a.chat || []).length ? b.chat : a.chat;
+    if (a.pyqFilter || b.pyqFilter) out.pyqFilter = b.pyqFilter || a.pyqFilter;
+    return out;
+  }
 
   /** Keep only what's needed to re-show a question. */
   const slim = (q) => ({ id: q.id, subject: q.subject, topic: q.topic, q: q.q, options: q.options, answer: q.answer, explanation: q.explanation });
@@ -80,9 +115,11 @@
   function exportData() { return JSON.stringify(state, null, 2); }
   function importData(json) { const s = JSON.parse(json); if (!s || typeof s !== 'object' || !s.profile) throw new Error('Not an ExamPrep backup file'); state = Object.assign(blank(), s); save(); }
   function reset() { state = blank(); save(); }
+  function clearLocal() { state = blank(); persist(); }
 
   EP.store = {
-    get state() { return state; }, save, record, streak, subjectStats, weakTopics, dueMistakes, toggleBookmark,
-    exportData, importData, reset, today, addDays,
+    get state() { return state; }, save, replaceState, mergeStates, blank,
+    set onChange(fn) { onChange = fn; }, record, streak, subjectStats, weakTopics, dueMistakes, toggleBookmark,
+    exportData, importData, reset, clearLocal, today, addDays,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

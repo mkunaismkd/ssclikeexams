@@ -185,3 +185,9 @@ details.review summary { cursor: pointer; display: flex; gap: .5rem; align-items
 .filters { margin-bottom: 1rem; } .filters select { flex: 0 1 220px; }
 textarea { width: 100%; }
 @media (prefers-color-scheme: dark) { .chip.pyq { background: #3a2e12; color: #f0c36a; } }
+
+/* sync badge */
+.sync-badge { margin-left: auto; white-space: nowrap; padding: .35rem .7rem; border-radius: 99px; font-size: .85rem; font-weight: 600; background: var(--surface-2); color: var(--muted); }
+.sync-badge.ok { color: var(--good); } .sync-badge.warn { color: var(--ok); } .sync-badge.bad { color: var(--bad); }
+.sync-badge.cta { background: var(--primary); color: var(--primary-ink); }
+@media (max-width: 820px) { .top { position: sticky; } .sync-badge { position: absolute; top: .6rem; right: 1rem; } }

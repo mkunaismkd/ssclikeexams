@@ -14,7 +14,20 @@ A learn → practise → mock → revise platform for **SSC CGL** (Tier 1 & 2) a
 | **AI (Groq)** | ✨ *Explain with AI* on any question · AI tutor chat for doubts · AI question generator for any topic (great for current affairs and banking awareness) · AI performance coach that reads your stats and builds a 7-day plan. |
 | **Plan & progress** | Exam countdown, phase-wise plan, daily time split weighted towards weak subjects, syllabus checklist, streaks, activity heatmap, topic accuracy, mock score trend. Export/import your progress. |
 
+| **Cloud sync** | Sign in with just your email (no password) and progress syncs automatically between phone, laptop and any other device. Works offline too — changes upload when you're back online. |
+
 Works on phones, supports dark mode, and installs as an app (PWA) with offline practice.
+
+## Cloud sync (Supabase)
+
+Progress is stored in the `public.examprep_progress` table (one JSON document per user, protected by row-level security so each user can only read and write their own row). The browser uses the Supabase **publishable** key in `js/config.js`, which is designed to be public.
+
+One-time setup in the Supabase dashboard (project `upsccurrent`):
+
+1. **Authentication → URL Configuration → Redirect URLs**: add `https://ssclikeexams.vercel.app/**` (and `http://localhost:3000/**` for local use). Without this, sign-in links send people to the other app's Site URL.
+2. **Emails to other people**: Supabase's built-in mailer only delivers to your own team's addresses and is rate-limited. To let anyone sign in, add a custom SMTP provider under **Authentication → Emails → SMTP Settings** (e.g. Resend or Brevo, both have free tiers).
+
+How sync behaves: every change is pushed ~1.5 s later; the app pulls when it opens, when you return to it, when the network comes back, and every minute. Writes are conditional on the version last seen, so two devices can't overwrite each other — on a conflict the app merges both and retries. Progress made on a device before signing in is added to the account on first sign-in. Signing out removes the progress from that device (it stays in the cloud).
 
 ## Run it
 
@@ -52,7 +65,8 @@ js/bank/*.js                           – hand-written question banks; bank/pyq
 js/exams.js                            – exam patterns (sections, timing, marking)
 js/notes.js                            – study notes
 js/engine.js                           – question drawing and mock assembly
-js/store.js                            – progress, streaks, spaced repetition (localStorage)
+js/store.js                            – progress, streaks, spaced repetition (localStorage) and merge logic
+js/sync.js, js/config.js               – Supabase sign-in and cloud sync
 js/ai-client.js, js/app.js             – AI client and the UI
 lib/ai.js                              – Groq integration (prompts, validation, fallback, rate limit)
 server.js                              – local server (static files + /api)

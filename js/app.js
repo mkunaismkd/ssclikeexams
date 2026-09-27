@@ -190,6 +190,7 @@
       h('div', { class: 'hero' },
         h('div', null,
           h('h1', null, p.name ? `Namaste, ${p.name}!` : 'Namaste! 🙏'),
+          EP.sync && EP.sync.status === 'signed-out' ? h('p', null, h('a', { href: '#/account' }, '☁ Sign in to sync your progress to your phone and other devices →')) : null,
           h('p', { class: 'muted' }, `Preparing for ${t.name}`, dl != null ? ` · ${dl >= 0 ? dl + ' days to go' : 'exam date passed — update it in Plan'}` : ' · set your exam date in Plan')),
         h('div', { class: 'track-switch' }, Object.entries(EP.TRACKS).map(([k, v]) =>
           h('button', { class: 'seg' + (p.track === k ? ' on' : ''), onclick: () => { p.track = k; S.save(); render(); } }, v.name)))),
@@ -676,6 +677,81 @@
     return [wrap];
   }
 
+
+  // ---------- account & cloud sync ----------
+  function Account() {
+    const sy = EP.sync;
+    if (!sy || sy.status === 'unavailable') {
+      return [h('h2', null, 'Account & sync'), card(null, h('p', null, 'Cloud sync is unavailable right now (you may be offline). Your progress is still saved on this device.'))];
+    }
+    const authError = new URLSearchParams(location.hash.split('?')[1] || '').get('error');
+    if (sy.user) {
+      const when = sy.lastSyncedAt ? sy.lastSyncedAt.toLocaleTimeString() : '—';
+      const stat = h('p', null, syncText());
+      return [h('h2', null, 'Account & sync'),
+        card('☁ Sync is on',
+          h('p', null, 'Signed in as ', h('strong', null, sy.user.email)),
+          stat,
+          h('p', { class: 'muted' }, `Last synced: ${when}. Your practice, mocks, mistakes, bookmarks, plan, chat and imported PYQs are saved to the cloud automatically and appear on every device where you sign in with this email.`),
+          h('div', { class: 'row' },
+            h('button', { class: 'btn primary', onclick: async () => { await sy.syncNow(); render(); toast(sy.status === 'synced' ? 'Synced' : sy.detail || 'Sync failed'); } }, '⟳ Sync now'),
+            h('button', { class: 'btn danger', onclick: async () => {
+              if (!confirm('Sign out? Your progress stays safe in the cloud and will be removed from this device.')) return;
+              await sy.signOut(); go('#/'); toast('Signed out');
+            } }, 'Sign out'))),
+        card('On your phone', h('ol', null,
+          h('li', null, 'Open ', h('strong', null, location.host), ' in your phone\'s browser.'),
+          h('li', null, 'Tap ☁ Sign in to sync and use the same email.'),
+          h('li', null, 'Optional: use "Add to Home screen" to install it like an app.')))];
+    }
+
+    const email = h('input', { type: 'email', placeholder: 'you@example.com', autocomplete: 'email', value: sessionStorageGet('ep-email') || '' });
+    const msg = h('div');
+    const codeBox = h('div');
+    const send = h('button', { class: 'btn primary', onclick: async () => {
+      const e = email.value.trim();
+      if (!/^\S+@\S+\.\S+$/.test(e)) { msg.replaceChildren(h('p', { class: 'error' }, 'Enter a valid email address.')); return; }
+      send.disabled = true; msg.replaceChildren(h('p', { class: 'muted pulse' }, 'Sending…'));
+      try {
+        await sy.sendLink(e); sessionStorageSet('ep-email', e);
+        msg.replaceChildren(h('p', { class: 'ok-text' }, `✓ Sign-in link sent to ${e}. Open it on this device (check spam too). The link works once and expires in about an hour.`));
+        const code = h('input', { type: 'text', inputmode: 'numeric', placeholder: '6-digit code', maxlength: 10, style: 'max-width:160px' });
+        const verify = h('button', { class: 'btn', onclick: async () => {
+          verify.disabled = true;
+          try { await sy.verifyCode(e, code.value); toast('Signed in'); go('#/account'); render(); }
+          catch (err) { msg.append(h('p', { class: 'error' }, err.message)); verify.disabled = false; }
+        } }, 'Verify code');
+        codeBox.replaceChildren(h('p', { class: 'muted small' }, 'If your email shows a code instead of (or as well as) a link, enter it here:'), h('div', { class: 'form-row' }, code, verify));
+      } catch (err) {
+        msg.replaceChildren(h('p', { class: 'error' }, /rate|seconds/i.test(err.message) ? 'Too many emails requested — please wait a minute and try again.' : err.message));
+      }
+      send.disabled = false;
+    } }, 'Email me a sign-in link');
+    email.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') send.click(); });
+    return [h('h2', null, 'Account & sync'),
+      authError ? card(null, h('p', { class: 'error' }, 'That sign-in link didn\'t work: ', authError, '. Request a new one below.')) : null,
+      card('Sync your progress across phone and laptop',
+        h('p', { class: 'muted' }, 'No password needed — we email you a sign-in link. Sign in with the same email on each device and everything stays in step automatically.'),
+        h('div', { class: 'form-row' }, email, send), msg, codeBox,
+        h('p', { class: 'muted small' }, 'Progress you made on this device before signing in is merged into your account.')),
+    ];
+  }
+
+  function syncText() {
+    const sy = EP.sync;
+    if (!sy) return '';
+    return { synced: '✓ All changes saved to the cloud', syncing: 'Syncing…', offline: '⚠ Offline — changes will sync when you reconnect', error: '⚠ Sync problem: ' + sy.detail, 'signed-out': 'Not signed in', unavailable: 'Cloud sync unavailable' }[sy.status] || '';
+  }
+
+  function paintSyncBadge() {
+    const el = document.getElementById('sync-badge');
+    const sy = EP.sync;
+    if (!el || !sy) return;
+    const map = { synced: ['☁ Synced', 'ok'], syncing: ['☁ Syncing…', ''], offline: ['☁ Offline', 'warn'], error: ['☁ Sync error', 'bad'], 'signed-out': ['☁ Sign in to sync', 'cta'], unavailable: ['☁ Offline', 'warn'], off: ['☁ …', ''] };
+    const [text, cls] = map[sy.status] || map.off;
+    el.textContent = text; el.className = 'sync-badge ' + cls; el.title = syncText();
+  }
+
   // ---------- AI tutor ----------
   function Tutor(prefill) {
     const msgs = S.state.chat;
@@ -784,7 +860,7 @@
         h('tbody', null, rows.map((r) => h('tr', null, h('td', null, subj(r.s).short), h('td', null, h('a', { href: `#/practice/${r.s}/${encodeURIComponent(r.tp)}` }, r.tp)), h('td', null, r.n), h('td', null, bar(r.acc), ' ', pct(r.acc)), h('td', null, Math.round(r.sec) + 's')))))
         : h('p', { class: 'muted' }, 'Start practising to see your analytics.')),
       card('AI performance coach', aiBox(() => EP.ai.analyze(collectStats()), 'Diagnose my preparation')),
-      card('Your data', h('p', { class: 'muted' }, 'Progress is saved in this browser. Export a backup to move it to another device.'),
+      card('Your data', h('p', { class: 'muted' }, EP.sync && EP.sync.user ? `Synced to your account (${EP.sync.user.email}) — available on every device you sign in on.` : 'Progress is saved in this browser only. Sign in (☁ at the top) to sync it across devices, or export a backup.'),
         h('div', { class: 'row' },
           h('button', { class: 'btn', onclick: () => { const a = h('a', { href: URL.createObjectURL(new Blob([S.exportData()], { type: 'application/json' })), download: `examprep-backup-${S.today()}.json` }); a.click(); } }, '⬇ Export'),
           h('button', { class: 'btn', onclick: () => fileIn.click() }, '⬆ Import'), fileIn,
@@ -818,7 +894,7 @@
 
   // ---------- router ----------
   const routes = {
-    '': Dashboard, learn: Learn, practice: Practice, mock: MockList, pyq: PYQ, revise: Revise, plan: Plan, progress: Progress,
+    '': Dashboard, learn: Learn, practice: Practice, mock: MockList, pyq: PYQ, revise: Revise, plan: Plan, progress: Progress, account: Account,
     tutor: () => Tutor(new URLSearchParams(location.hash.split('?')[1] || '').get('q')),
   };
   let lastHash = location.hash;
@@ -833,13 +909,34 @@
     lastHash = location.hash;
     window.scrollTo(0, 0);
   }
-  window.addEventListener('hashchange', () => {
-    if (leaveGuard && leaveGuard()) { history.replaceState(null, '', lastHash); return; }
-    render();
-  });
   window.addEventListener('beforeunload', (e) => { if (leaveGuard && document.body.classList.contains('in-test')) { e.preventDefault(); e.returnValue = ''; } });
 
   EP.ai.available().then((ok) => document.body.classList.toggle('ai-on', ok));
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
-  render();
+
+  if (EP.sync) {
+    EP.sync.onStatus(() => { paintSyncBadge(); if (location.hash.startsWith('#/account')) render(); });
+    // Another device changed something: refresh the screen unless a test or practice session is in progress.
+    EP.sync.onRemoteChange(() => { if (!leaveGuard && !keyHandler) render(); });
+    paintSyncBadge();
+  }
+  // Coming back from an emailed sign-in link: the URL carries tokens (#access_token=…) or an error, not a route.
+  function handleAuthHash() {
+    const hs = location.hash;
+    if (!/access_token=|error_description=/.test(hs)) return false;
+    const err = new URLSearchParams(hs.slice(1)).get('error_description');
+    view.replaceChildren(h('p', { class: 'muted pulse' }, 'Signing you in…'));
+    (EP.sync ? EP.sync.ready : Promise.resolve()).then(() => {
+      history.replaceState(null, '', err ? '#/account?error=' + encodeURIComponent(err) : '#/');
+      lastHash = location.hash; render();
+      if (!err) toast('Signed in — syncing your progress');
+    });
+    return true;
+  }
+  window.addEventListener('hashchange', (e) => { if (handleAuthHash()) e.stopImmediatePropagation(); }, true);
+  window.addEventListener('hashchange', () => {
+    if (leaveGuard && leaveGuard()) { history.replaceState(null, '', lastHash); return; }
+    render();
+  });
+  if (!handleAuthHash()) render();
 })();
