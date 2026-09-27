@@ -48,15 +48,47 @@ test('count is clamped to 10', () => {
   assert.match(buildRequest({ mode: 'generate', subject: 'quant', count: 999 }).messages[1].content, /^Write 10 /);
 });
 
-test('falls back to a smaller model if the configured one is retired', async () => {
-  const models = [];
-  const fetchImpl = async (u, o) => {
-    const m = JSON.parse(o.body).model; models.push(m);
-    return m === 'retired-model' ? reply(404, { error: { message: 'model not found' } }) : reply(200, chat('ok', m));
+function fakeGroq({ available, reject = [], noJsonMode = false }) {
+  const calls = [];
+  const fetchImpl = async (url, o) => {
+    if (url.endsWith('/models')) { calls.push('GET models'); return reply(200, { data: available }); }
+    const body = JSON.parse(o.body); calls.push(body.model + (body.response_format ? '+json' : ''));
+    if (reject.includes(body.model) || !available.some((m) => m.id === body.model)) return reply(404, { error: { message: `The model \`${body.model}\` does not exist` } });
+    if (noJsonMode && body.response_format) return reply(400, { error: { message: 'response_format is not supported' } });
+    const wantsQuestions = JSON.stringify(body.messages).includes('Return JSON');
+    return reply(200, chat(wantsQuestions ? '{"questions":[{"q":"x","options":["1","2","3","4"],"answer":0}]}' : '<think>hmm</think>\nAnswer', body.model));
   };
-  const out = await handleAI({ mode: 'explain', question: { q: '2+2', options: ['3', '4', '5', '6'], answer: 1 } }, { GROQ_API_KEY: 'k', GROQ_MODEL: 'retired-model' }, fetchImpl);
-  assert.deepStrictEqual(models, ['retired-model', 'llama-3.1-8b-instant']);
+  return { calls, fetchImpl };
+}
+const explainBody = { mode: 'explain', question: { q: '2+2', options: ['3', '4', '5', '6'], answer: 1 } };
+
+test('discovers an available model when the configured one is retired, then reuses it', async () => {
+  require('../lib/ai')._resetDiscovery();
+  const g = fakeGroq({ available: [{ id: 'whisper-large-v3', context_window: 999999 }, { id: 'some-new-model', context_window: 8192 }, { id: 'openai/gpt-oss-120b', context_window: 131072 }] });
+  const out = await handleAI(explainBody, { GROQ_API_KEY: 'k', GROQ_MODEL: 'retired-model' }, g.fetchImpl);
   assert.strictEqual(out.status, 200);
+  assert.strictEqual(out.body.text, 'Answer', 'reasoning block is stripped');
+  assert.deepStrictEqual(g.calls, ['retired-model', 'GET models', 'openai/gpt-oss-120b']);
+  await handleAI(explainBody, { GROQ_API_KEY: 'k', GROQ_MODEL: 'retired-model' }, g.fetchImpl);
+  assert.strictEqual(g.calls.at(-1), 'openai/gpt-oss-120b', 'discovered model is cached');
+  assert.strictEqual(g.calls.filter((c) => c === 'GET models').length, 1);
+});
+
+test('with no preferred model available, picks the largest chat model (never whisper/guard)', async () => {
+  require('../lib/ai')._resetDiscovery();
+  const g = fakeGroq({ available: [{ id: 'llama-guard-9', context_window: 900000 }, { id: 'small-x', context_window: 8192 }, { id: 'big-y', context_window: 128000 }] });
+  const out = await handleAI(explainBody, { GROQ_API_KEY: 'k' }, g.fetchImpl);
+  assert.strictEqual(out.status, 200);
+  assert.strictEqual(g.calls.at(-1), 'big-y');
+});
+
+test('retries without JSON mode for models that do not support it', async () => {
+  require('../lib/ai')._resetDiscovery();
+  const g = fakeGroq({ available: [{ id: 'llama-3.3-70b-versatile' }], noJsonMode: true });
+  const out = await handleAI({ mode: 'generate', subject: 'quant', count: 1 }, { GROQ_API_KEY: 'k' }, g.fetchImpl);
+  assert.strictEqual(out.status, 200);
+  assert.deepStrictEqual(g.calls, ['llama-3.3-70b-versatile+json', 'llama-3.3-70b-versatile']);
+  assert.strictEqual(out.body.questions.length, 1);
 });
 
 test('rate limit from Groq becomes a friendly 429', async () => {

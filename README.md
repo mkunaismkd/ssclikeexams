@@ -32,7 +32,7 @@ node server.js              # → http://localhost:3000
 
 The key stays on the server — the browser only talks to `/api/ai`, which builds the prompts itself (so it can't be used as a general-purpose LLM proxy) and rate-limits each IP (`AI_RATE_LIMIT`, default 30/min) to protect your free quota.
 
-The default model is `llama-3.3-70b-versatile`. Set `GROQ_MODEL` to any model from <https://console.groq.com/docs/models>; if the configured model is retired, the server automatically retries on `llama-3.1-8b-instant`.
+You don't need to pick a model. The server tries `GROQ_MODEL` (default `llama-3.3-70b-versatile`), and if Groq has retired it, it asks Groq which models your key can use and switches to the best available one automatically. Set `GROQ_MODEL` only if you want a specific model from <https://console.groq.com/docs/models>.
 
 Without a key everything except the ✨ AI features still works. You can even open `index.html` directly (no server) for offline practice.
 

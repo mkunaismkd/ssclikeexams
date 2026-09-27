@@ -68,7 +68,7 @@ const server = http.createServer(async (req, res) => {
 if (require.main === module) {
   server.listen(PORT, () => {
     console.log(`ExamPrep running at http://localhost:${PORT}`);
-    console.log(process.env.GROQ_API_KEY ? `AI: Groq enabled (model ${process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'})` : 'AI: disabled — add GROQ_API_KEY to .env (free key: https://console.groq.com/keys)');
+    console.log(process.env.GROQ_API_KEY ? `AI: Groq enabled (model ${process.env.GROQ_MODEL || 'auto'})` : 'AI: disabled — add GROQ_API_KEY to .env (free key: https://console.groq.com/keys)');
   });
 }
 
