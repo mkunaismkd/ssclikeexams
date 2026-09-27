@@ -1,0 +1,7 @@
+# server.js is only for local use (node server.js). On Vercel the app is served
+# as static files and /api/* runs from the api/ folder, so keep it out of the
+# deployment — otherwise Vercel treats the whole project as a single Node server.
+server.js
+tests/
+.env
+.env.example

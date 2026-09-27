@@ -38,7 +38,7 @@ Without a key everything except the ✨ AI features still works. You can even op
 
 ## Deploy free on Vercel
 
-1. Import this repo in Vercel (framework preset: **Other**, no build command).
+1. Import this repo in Vercel. `vercel.json` already sets the preset to **Other** with no build step, and `.vercelignore` keeps the local-only `server.js` out of the deployment.
 2. In **Settings → Environment Variables** add `GROQ_API_KEY` (and optionally `GROQ_MODEL`).
 3. Deploy. `api/ai.js` and `api/health.js` run as serverless functions; everything else is static.
 
