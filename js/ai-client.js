@@ -26,6 +26,8 @@
     return data;
   }
 
+  const pyqLabel = (p) => [p.exam, p.shift || p.year].filter(Boolean).join(', ');
+  EP.pyqLabel = pyqLabel;
   const examName = () => (EP.TRACKS[EP.store.state.profile.track] || {}).name || 'SSC CGL';
 
   EP.ai = {
@@ -33,6 +35,13 @@
     tutor: (messages) => call({ mode: 'tutor', exam: examName(), messages }).then((d) => d.text),
     explain: (question, chosen) => call({ mode: 'explain', exam: examName(), question, chosen }).then((d) => d.text),
     analyze: (stats) => call({ mode: 'analyze', exam: examName(), stats }).then((d) => d.text),
+    /** Questions modelled on a PYQ (same concept and difficulty, new numbers/wording). */
+    similar: async (question, count = 5) => {
+      const d = await call({ mode: 'similar', exam: examName(), count, question: { q: question.q, options: question.options, answer: question.answer, topic: question.topic, source: question.pyq ? pyqLabel(question.pyq) : '' } });
+      return d.questions.map((q, i) => ({ ...q, id: 'ai-' + EP.hash(q.q + i + Date.now()), subject: question.subject, topic: question.topic, source: 'ai', similarTo: question.pyq ? pyqLabel(question.pyq) : '' }));
+    },
+    /** Turn pasted question-paper text into structured questions. */
+    extract: (text, exam) => call({ mode: 'extract', exam, text }).then((d) => d.questions),
     generate: async ({ subject, topic, count, difficulty }) => {
       const d = await call({ mode: 'generate', exam: examName(), subject, topic, count, difficulty });
       return d.questions.map((q, i) => ({ ...q, id: 'ai-' + EP.hash(q.q + i + Date.now()), subject, topic: topic || 'AI Mixed', source: 'ai' }));

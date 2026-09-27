@@ -177,3 +177,11 @@ details.review summary { cursor: pointer; display: flex; gap: .5rem; align-items
   .subj-row { grid-template-columns: 80px 1fr 90px; }
   .msg { max-width: 95%; }
 }
+
+/* PYQs */
+.chip.pyq { background: #fff3d6; color: #8a5a00; }
+.chip.warn { background: var(--bad-bg); color: var(--bad); } .chip.ok { background: var(--good-bg); color: var(--good); }
+.warn { color: var(--ok); }
+.filters { margin-bottom: 1rem; } .filters select { flex: 0 1 220px; }
+textarea { width: 100%; }
+@media (prefers-color-scheme: dark) { .chip.pyq { background: #3a2e12; color: #f0c36a; } }

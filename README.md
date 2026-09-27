@@ -9,6 +9,7 @@ A learn → practise → mock → revise platform for **SSC CGL** (Tier 1 & 2) a
 | **Learn** | Concise notes, formulas and shortcuts for every major Quant, Reasoning, English, GA, ESI and F&M topic. Topics without notes open in the AI tutor. |
 | **Practice** | Topic-wise or mixed sets with instant feedback and worked solutions. Quant and Reasoning questions are **generated fresh every time** (22 quant and 13 reasoning topic generators), so you never run out. Plus hand-written banks for English, GA, banking, ESI, F&M, syllogisms, seating and blood relations. |
 | **Mock tests** | Exam-pattern mocks with negative marking, a question palette, mark-for-review, and **sectional timing** for RBI Phase 1. Includes SSC CGL Tier 1, Tier 2 (both sections), RBI Phase 1, RBI Phase 2 ESI/F&M objective, and a 15-minute daily "Quick 20". |
+| **PYQs** | Previous-year papers tagged with exam, date/shift and source. Practise with instant answers, attempt as a timed paper, or hit **✨ Similar questions** on any PYQ (or a whole paper) to get new AI questions on the same pattern. Add real papers with the **AI importer**: paste text from an official SSC answer key or a solved paper and it becomes structured questions; answers taken from the key vs. solved by AI are labelled. (The RBI does not publish papers, so RBI PYQs are memory-based.) |
 | **Revision** | Every wrong answer goes into a spaced-repetition mistake book (today → 1 → 3 → 7 → 16 → 35 days). Bookmark any question. |
 | **AI (Groq)** | ✨ *Explain with AI* on any question · AI tutor chat for doubts · AI question generator for any topic (great for current affairs and banking awareness) · AI performance coach that reads your stats and builds a 7-day plan. |
 | **Plan & progress** | Exam countdown, phase-wise plan, daily time split weighted towards weak subjects, syllabus checklist, streaks, activity heatmap, topic accuracy, mock score trend. Export/import your progress. |
@@ -47,7 +48,7 @@ Without a key everything except the ✨ AI features still works. You can even op
 ```
 index.html, css/, icon.svg, manifest.webmanifest, sw.js   – the app (plain JS, no build step)
 js/gen-quant.js, js/gen-reasoning.js   – procedural question generators with worked solutions
-js/bank/*.js                           – hand-written question banks
+js/bank/*.js                           – hand-written question banks; bank/pyq.js holds built-in previous-year papers
 js/exams.js                            – exam patterns (sections, timing, marking)
 js/notes.js                            – study notes
 js/engine.js                           – question drawing and mock assembly

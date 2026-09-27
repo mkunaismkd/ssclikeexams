@@ -19,6 +19,7 @@
     bookmarks: {}, // id → q
     done: {},      // "subject|topic" → true (syllabus checklist)
     chat: [],
+    pyqPapers: {}, // imported previous-year papers: id → { id, examKey, exam, year, shift, source, questions }
   });
 
   let state;

@@ -106,3 +106,26 @@ test('validateQuestions tolerates text around the JSON', () => {
   const qs = validateQuestions('Here you go:\n{"questions":[{"q":"x","options":["1","2","3","4"],"answer":0}]}');
   assert.strictEqual(qs.length, 1);
 });
+
+test('similar mode includes the PYQ and its source, and asks for new questions', () => {
+  const r = buildRequest({ mode: 'similar', count: 3, question: { q: 'A train 120 m long…', options: ['6 s', '8 s', '10 s', '12 s'], answer: 1, topic: 'Speed', source: 'SSC CGL Tier 1, 21 Jul 2023, Shift 1' } });
+  assert.ok(r.json);
+  const prompt = r.messages[1].content;
+  assert.match(prompt, /SSC CGL Tier 1, 21 Jul 2023, Shift 1/);
+  assert.match(prompt, /A train 120 m long/);
+  assert.match(prompt, /Correct answer: B/);
+  assert.match(prompt, /Write 3 NEW questions/);
+});
+
+test('extract mode keeps subject, topic and answer source; rejects empty text', async () => {
+  assert.throws(() => buildRequest({ mode: 'extract', text: '  ' }), /Paste/);
+  const content = JSON.stringify({ questions: [
+    { q: 'Who wrote Gitanjali?', options: ['Tagore', 'Premchand', 'Naidu', 'Bankim'], answer: 0, answerSource: 'key', subject: 'ga', topic: 'Literature' },
+    { q: 'Unmarked', options: ['1', '2', '3', '4'], answer: 2, answerSource: 'something', subject: 'nonsense' },
+  ] });
+  const out = await handleAI({ mode: 'extract', text: 'Q1. Who wrote Gitanjali? (a) Tagore (b) Premchand (c) Naidu (d) Bankim Ans: a'.repeat(2) }, env, async () => reply(200, chat(content)));
+  assert.strictEqual(out.status, 200);
+  assert.deepStrictEqual(out.body.questions[0], { q: 'Who wrote Gitanjali?', options: ['Tagore', 'Premchand', 'Naidu', 'Bankim'], answer: 0, explanation: '', subject: 'ga', topic: 'Literature', answerSource: 'key' });
+  assert.strictEqual(out.body.questions[1].answerSource, 'ai');
+  assert.strictEqual(out.body.questions[1].subject, undefined);
+});
