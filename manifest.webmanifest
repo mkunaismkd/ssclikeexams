@@ -1,0 +1,9 @@
+{
+  "name": "ExamPrep — SSC CGL & RBI Grade B",
+  "short_name": "ExamPrep",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#1f4ea3",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
