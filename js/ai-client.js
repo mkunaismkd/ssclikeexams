@@ -2,21 +2,23 @@
 (function (root) {
   const EP = root.EP || (root.EP = {});
   let status = null; // null = unknown, true/false after /api/health
+  let reason = '';    // why AI is unavailable, shown to the user
 
   async function available() {
     if (status !== null) return status;
-    if (location.protocol === 'file:') return (status = false);
+    if (location.protocol === 'file:') { reason = 'AI needs the server. Run "node server.js" and open http://localhost:3000.'; return (status = false); }
     try {
       const r = await fetch('api/health', { cache: 'no-store' });
-      status = r.ok && (await r.json()).ai === true;
-    } catch { status = false; }
+      const data = r.ok ? await r.json().catch(() => null) : null;
+      if (!data) reason = `The AI endpoint /api/health is not reachable (HTTP ${r.status}). Check that the api/ folder is deployed.`;
+      else if (!data.ai) reason = 'The server is running but GROQ_API_KEY is empty. Paste your key (starts with gsk_) into the GROQ_API_KEY environment variable and redeploy.';
+      status = Boolean(data && data.ai);
+    } catch (e) { reason = 'Could not reach the AI server: ' + e.message; status = false; }
     return status;
   }
 
   async function call(payload) {
-    if (!(await available())) throw new Error(location.protocol === 'file:'
-      ? 'AI needs the server. Run "node server.js" and open http://localhost:3000.'
-      : 'AI is not configured. Add GROQ_API_KEY on the server (free key at console.groq.com).');
+    if (!(await available())) throw new Error(reason);
     const r = await fetch('api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     let data = {};
     try { data = await r.json(); } catch { /* non-JSON error page */ }
